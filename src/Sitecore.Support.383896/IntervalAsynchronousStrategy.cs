@@ -1,40 +1,31 @@
-﻿
-using System;
+﻿using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.Serialization;
 using Sitecore.ContentSearch;
 using Sitecore.ContentSearch.Abstractions;
 using Sitecore.ContentSearch.Diagnostics;
 using Sitecore.ContentSearch.Maintenance;
-using Sitecore.ContentSearch.Maintenance.Strategies;
 using Sitecore.ContentSearch.Utilities;
 using Sitecore.Data;
 using Sitecore.Data.Archiving;
 using Sitecore.Data.Managers;
 using Sitecore.Diagnostics;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace Sitecore.Support.ContentSearch.Maintenance.Strategies
 {
     [DataContract]
-    public class RestoredItemsUpdateStrategy  : IIndexUpdateStrategy
+    public class IntervalAsynchronousStrategy : Sitecore.ContentSearch.Maintenance.Strategies.IntervalAsynchronousStrategy, ISearchIndexInitializable
     {
-        ISearchIndex index;
-
-        public RestoredItemsUpdateStrategy(string database)
+        public IntervalAsynchronousStrategy(string database, string interval = null) : base(database, interval)
         {
-            Assert.IsNotNullOrEmpty(database, "database");
-            this.Database = ContentSearchManager.Locator.GetInstance<IFactory>().GetDatabase(database);
-            Assert.IsNotNull(this.Database, string.Format("Database '{0}' was not found", database));
         }
 
-        public Database Database { get; protected set; }
+        ISearchIndex index;
 
-        public void Initialize(ISearchIndex index)
+        void ISearchIndexInitializable.Initialize(ISearchIndex index)
         {
-            Assert.IsNotNull(index, "index");
-            CrawlingLog.Log.Info(string.Format("[Index={0}] Initializing RestoredItemsUpdateStrategy.", index.Name));
-
+            base.Initialize(index);
+            
             this.index = index;
             this.InitializeSubscribers();
         }
@@ -48,8 +39,8 @@ namespace Sitecore.Support.ContentSearch.Maintenance.Strategies
             }
 
             var instance = ContentSearchManager.Locator.GetInstance<IEventManager>();
-            instance.Subscribe<RestoreVersionCompletedEvent>(new Action<RestoreVersionCompletedEvent>(OnRestoreVersionCompletedHandler));
-            instance.Subscribe<RestoreItemCompletedEvent>(new Action<RestoreItemCompletedEvent>(OnRestoreItemCompletedHandler));
+            instance.Subscribe<RestoreVersionCompletedEvent>(this.OnRestoreVersionCompletedHandler);
+            instance.Subscribe<RestoreItemCompletedEvent>(this.OnRestoreItemCompletedHandler);
         }
 
         protected virtual void OnRestoreVersionCompletedHandler(RestoreVersionCompletedEvent restoreVersionCompletedEvent)
@@ -60,9 +51,9 @@ namespace Sitecore.Support.ContentSearch.Maintenance.Strategies
             }
 
             var itemUri = new ItemUri(
-                new ID(restoreVersionCompletedEvent.ItemId), 
+                new ID(restoreVersionCompletedEvent.ItemId),
                 LanguageManager.GetLanguage(restoreVersionCompletedEvent.Language),
-                new Sitecore.Data.Version(restoreVersionCompletedEvent.Version), 
+                new Sitecore.Data.Version(restoreVersionCompletedEvent.Version),
                 Database.GetDatabase(restoreVersionCompletedEvent.DatabaseName));
             var list = new List<SitecoreItemUniqueId>(1)
             {
@@ -91,13 +82,13 @@ namespace Sitecore.Support.ContentSearch.Maintenance.Strategies
 
             if (IndexCustodian.IsIndexingPaused(this.index))
             {
-                CrawlingLog.Log.Warn(string.Format("[Index={0}] Synchronous Indexing Strategy is disabled while indexing is paused.", this.index.Name));
+                CrawlingLog.Log.Warn(string.Format("SUPPORT [Index={0}] The Strategy is disabled while indexing is paused.", this.index.Name));
                 return;
             }
 
             if (BulkUpdateContext.IsActive)
             {
-                CrawlingLog.Log.Debug("Synchronous Indexing Strategy is disabled during BulkUpdateContext");
+                CrawlingLog.Log.Debug("SUPPORT The strategy is disabled during BulkUpdateContext");
                 return;
             }
 
