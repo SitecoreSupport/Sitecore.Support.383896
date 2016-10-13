@@ -2,7 +2,7 @@
 Index is not updated after an item is restored from the Recycle Bin
 
 ## Description
-TODO: provide more details here.
+The IntervalAsynchronousStrategy strategy doesn't handle items which were restored from the Recycle Bin. The patch is designed to address the issue.
 
 ## License  
 This patch is licensed under the [Sitecore Corporation A/S License for GitHub](https://github.com/sitecoresupport/Sitecore.Support.383896/blob/master/LICENSE).  
